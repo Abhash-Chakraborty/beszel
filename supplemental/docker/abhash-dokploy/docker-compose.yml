@@ -1,0 +1,35 @@
+# Abhash Version Beszel: hub + same-host agent for Dokploy.
+# Replace BESZEL_KEY and BESZEL_TOKEN after creating the system in the hub UI.
+
+services:
+  beszel:
+    image: ghcr.io/abhash-chakraborty/beszel:abhash-main
+    container_name: beszel
+    restart: unless-stopped
+    environment:
+      APP_URL: ${APP_URL:-http://localhost:8090}
+    ports:
+      - "8090:8090"
+    volumes:
+      - beszel_data:/beszel_data
+      - beszel_socket:/beszel_socket
+
+  beszel-agent:
+    image: ghcr.io/abhash-chakraborty/beszel-agent:abhash-main
+    container_name: beszel-agent
+    restart: unless-stopped
+    network_mode: host
+    volumes:
+      - beszel_agent_data:/var/lib/beszel-agent
+      - beszel_socket:/beszel_socket
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: /beszel_socket/beszel.sock
+      HUB_URL: ${HUB_URL:-http://localhost:8090}
+      TOKEN: ${BESZEL_TOKEN:-replace-with-agent-token}
+      KEY: ${BESZEL_KEY:-replace-with-agent-public-key}
+
+volumes:
+  beszel_data:
+  beszel_agent_data:
+  beszel_socket:
