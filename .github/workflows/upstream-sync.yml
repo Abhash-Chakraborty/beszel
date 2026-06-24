@@ -1,0 +1,87 @@
+name: Sync upstream into Abhash-Main
+
+on:
+  schedule:
+    - cron: "30 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: upstream-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: Mirror upstream main and open PR
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      UPSTREAM_REPO: henrygd/beszel
+      MIRROR_BRANCH: main
+      PERSONAL_BRANCH: Abhash-Main
+    steps:
+      - name: Checkout fork main
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ env.MIRROR_BRANCH }}
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config rerere.enabled true
+          git config rerere.autoupdate true
+
+      - name: Mirror upstream main into fork main
+        run: |
+          git remote add upstream "https://github.com/${UPSTREAM_REPO}.git"
+          git fetch upstream main
+          git checkout "${MIRROR_BRANCH}"
+          git reset --hard upstream/main
+          git push origin "${MIRROR_BRANCH}" --force-with-lease
+
+      - name: Check for upstream changes not in Abhash-Main
+        id: changes
+        run: |
+          git fetch origin "${MIRROR_BRANCH}" "${PERSONAL_BRANCH}"
+          ahead_count="$(git rev-list --count "origin/${PERSONAL_BRANCH}..origin/${MIRROR_BRANCH}")"
+          echo "ahead_count=${ahead_count}" >> "$GITHUB_OUTPUT"
+          if [ "${ahead_count}" = "0" ]; then
+            echo "has_changes=false" >> "$GITHUB_OUTPUT"
+            echo "No upstream commits need to be merged into ${PERSONAL_BRANCH}."
+          else
+            echo "has_changes=true" >> "$GITHUB_OUTPUT"
+            echo "${ahead_count} upstream commit(s) need to be merged into ${PERSONAL_BRANCH}."
+          fi
+
+      - name: Create or update PR into Abhash-Main
+        id: pr
+        if: steps.changes.outputs.has_changes == 'true'
+        run: |
+          set -euo pipefail
+          existing_pr="$(gh pr list \
+            --base "${PERSONAL_BRANCH}" \
+            --head "${MIRROR_BRANCH}" \
+            --state open \
+            --json url \
+            --jq '.[0].url')"
+
+          if [ -n "${existing_pr}" ]; then
+            pr_url="${existing_pr}"
+          else
+            pr_url="$(gh pr create \
+              --base "${PERSONAL_BRANCH}" \
+              --head "${MIRROR_BRANCH}" \
+              --title "Sync upstream main into Abhash-Main" \
+              --body "Automated upstream sync from ${UPSTREAM_REPO}:main into Abhash-Main. Auto-merge is enabled when the PR is mergeable and required checks pass.")"
+          fi
+
+          echo "url=${pr_url}" >> "$GITHUB_OUTPUT"
+
+      - name: Enable auto-merge after checks pass
+        if: steps.changes.outputs.has_changes == 'true'
+        run: gh pr merge "${{ steps.pr.outputs.url }}" --auto --merge
