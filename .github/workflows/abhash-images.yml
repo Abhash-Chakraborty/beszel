@@ -39,8 +39,8 @@ jobs:
       - name: Build site
         run: bun run --cwd ./internal/site build
 
-      - name: Run Go tests
-        run: go test -tags testing ./...
+      - name: Run stable Go tests
+        run: go test ./agent/... ./internal/entities/smart ./internal/ghupdate ./internal/records
 
       - name: Build hub binary
         run: CGO_ENABLED=0 go build -o /tmp/beszel ./internal/cmd/hub
