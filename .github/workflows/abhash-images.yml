@@ -40,7 +40,7 @@ jobs:
         run: bun run --cwd ./internal/site build
 
       - name: Run Go tests
-        run: go test ./...
+        run: go test -tags testing ./...
 
       - name: Build hub binary
         run: CGO_ENABLED=0 go build -o /tmp/beszel ./internal/cmd/hub
@@ -117,4 +117,3 @@ jobs:
           push: true
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
-
