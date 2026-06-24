@@ -8,6 +8,9 @@ services:
     restart: unless-stopped
     environment:
       APP_URL: ${APP_URL:-http://localhost:8090}
+      USER_EMAIL: ${BESZEL_ADMIN_EMAIL:-}
+      USER_PASSWORD: ${BESZEL_ADMIN_PASSWORD:-}
+      USER_CREATION: "false"
     ports:
       - "8090:8090"
     volumes:
